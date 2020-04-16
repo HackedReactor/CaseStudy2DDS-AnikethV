@@ -3,12 +3,16 @@ title: 'Case Study 2: DDS'
 author: "Aniketh V"
 date: "4/13/2020"
 output: html_document
-editor_options: 
-  chunk_output_type: console
 ---
 
+#Attrition and Income- Frito Lays
+
+##Introduction
+Greetings! Today we will be discussing "Attrition and Income" too check what leads to attrition and income levels for talent management. 
+
+#Setting up the environment
 ```{r}
-#Loading in the Data
+#Loading in the required libraries
 library(stringr)
 library(dplyr)
 library(plyr)
@@ -21,10 +25,7 @@ library(mice)
 library(e1071)
 library(class)
 library(caret)
-```
 
-
-```{r}
 #Reading in the data
 attritionData = read.csv(file.choose(), header = TRUE)
 noAttritionData = read.csv(file.choose(), header = TRUE)
@@ -35,11 +36,40 @@ summary(attritionData)
 summary(noAttritionData)
 ```
 
+##Exploratory Data Analysis
+As part of the first step we would like to take a rough look at the data at hand. We want to do some intial analysis to see if anything catches our eye. Additionally, we will take a look at the data types for the variables to see what we are working with.
+```{r}
+#View the data types for each variable we are dealing with
+dplyr::glimpse(attritionData)
+
+#Separate the numerical and categorical variables in the dataframe
+sapply(attritionData, is.factor)
+
+#Categorical variables only
+categoricalVar = attritionData[,sapply(attritionData, is.factor)] 
+summary(categoricalVar)
+
+#Numerical variables only
+numericalVar = attritionData[,!sapply(attritionData, is.factor)]
+summary(numericalVar)
+
+#Lets look at a rough analysis on multiple different columns to see if we can figure something out
+attritionData %>% select(Attrition, JobRole, MonthlyIncome) %>% ggpairs(aes(color = Attrition))
+attritionData %>% select(MonthlyIncome, Education, TotalWorkingYears, Attrition) %>% ggpairs(mapping = aes(color = Attrition)) + ggtitle("Monthly Income vs Education, Experience, and Attrition")
+attritionData %>% select(MonthlyIncome, YearsAtCompany, TotalWorkingYears, YearsInCurrentRole, OverTime) %>% ggpairs(mapping = aes(color = OverTime)) + ggtitle("Monthly Income vs Years in Industry by Overtime")
+
+#Lets look at if Monthyly income and Job Role play a role in determining Attrition
+attritionData %>% ggplot(aes(x = JobRole, y = MonthlyIncome, fill = Attrition)) + geom_bar(stat = "identity", width = .5) + labs(title = "Income", subtitle = "along with Attrition") + theme(axis.text.x = element_text(angle = 65, vjust = 0.6))
+
+attritionData %>% ggplot(aes(x = MonthlyIncome, y = YearsAtCompany, color = JobRole)) + geom_point(position = "jitter")
+```
+At a glance, it looks like a common variable that influences Attrition as well as monthly income is Total Working Years (experience). There is a moderate correlation between Monthly Income and Years at company along with attrition.
+
 ```{r}
 #ScatterPlot for trends
 attritionData %>% ggplot(aes(x = MonthlyIncome, y = Education)) + geom_point(position = "jitter")
 
-attritionData %>% ggplot(aes(x = MonthlyIncome, y = Attrition)) + geom_point(position = "jitter")
+attritionData %>% ggplot(aes(x = Age, y = Attrition)) + geom_point(position = "jitter")
 
 
 #Need to dummy code Attrition
