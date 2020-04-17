@@ -96,8 +96,32 @@ summary(attritionData$Age)
 #I want to see what relationship age and years since last promotion have with attrition. Does the age and the years since last promotion affect attrition?
 attritionData %>% ggplot(aes(x = Age, y = YearsSinceLastPromotion, color = Attrition)) + geom_point(position = "jitter") + geom_smooth(method = "lm", se = F) + ggtitle("Age vs Years at Company colored by Attrition")
 
+#Creating an new column with age groups the ages fall under
+attritionData = attritionData %>% mutate(ageGroup = case_when(Age >=18 & Age <= 30 ~ '18-30',
+                                         Age >=31 & Age <= 45 ~ '31-45',
+                                         Age >=46 & Age <= 60 ~ '46-60'))
+count(attritionData, "ageGroup")
+#Tallying the number for Attrition for Yes and No
+ageCountFinal = attritionData %>% group_by(Attrition, ageGroup) %>% tally()
+
+ageCountFinal = ageCountFinal %>% mutate(Perc = n/870)
+ageCountFinal$Perc = round(ageCountFinal$Perc*100, digits = 3)
+
+attritionData %>% ggplot(aes(x = JobRole, y = StockOptionLevel, fill = Attrition)) + geom_bar(stat = "identity", width = .5) + labs(title = "Stock Option Level", subtitle = "By Job Role and colored by Attrition") + theme(axis.text.x = element_text(angle = 65, vjust = 0.6))
+
 ```
 At a glance, it looks like age and years since last promotion do play a big role for turnover/attrition. As per the final graph there seems to be some information that tells us that there are many young people that seem to leave the company. At 0 since years since last promotion, this tells me that they have not been working in the company as long. 
+
+Final picks:
+Age
+- 6.6% Attrition perc for employees 18-30
+- 7.2% Attrition perc for employees 31-45
+- 2.3% Attrition perc for employees 45-60
+YearSinceLastPromotion
+- Wild Card, has a mixed bag of attrition rates as per the graph
+StockOptionLevel
+- The higher positions, such as researchers and executives have the most stock options and the higher attrition rate per the other job posts
+- Possibly leave once their portfolio matures at the company, to make a passive income.
 
 #Interesting Facts/Trend
 There was also an interesting trend that was noticed as something that is interesting. As per the bar chart it looks like the most satisfying job is the Sales Executive Job. Human resources specialists and managers seem to have the lower job satisfaction. There is definitely more men than women that filled some of these roles.
@@ -156,7 +180,10 @@ knn(case[,c(2,3,4)], att, case$Attrition, k = 3, prob = TRUE)
 attr_pred = knn(case[,c(2,3,4)], noAttr[,c(2,3,4)], case$Attrition, k = 13, prob = TRUE)
 noAttr$Attrition = attr_pred
 confusionMatrix(table(attr_pred, noAttr$Attrition))
-noAttr = noAttr[,-5]
+predictionsAttrition = noAttr %>% select(ID, Attrition)
+
+write.csv(predictionsAttrition, file = "Case2PredictionsClassifyVankina Attrtion.csv")
+
 
 #Train Data and Test Set
 set.seed(6)
