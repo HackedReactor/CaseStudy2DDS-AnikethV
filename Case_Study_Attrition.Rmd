@@ -25,6 +25,7 @@ library(mice)
 library(e1071)
 library(class)
 library(caret)
+library(ggcorrplot)
 
 #Reading in the data
 attritionData = read.csv("/Users/password1234/Documents/Doing_Data_Science/MSDS_6306_Doing-Data-Science/Unit\ 14\ and\ 15\ Case\ Study\ 2/CaseStudy2-data.csv", header = TRUE)
@@ -58,9 +59,29 @@ summary(categoricalVar)
 numericalVar = attritionData[,!sapply(attritionData, is.factor)]
 summary(numericalVar)
 
+#Observing numerical variables that we can use to predict monthly income for linear regression equation.
+corr = round(cor(numericalVar), 1)
+ggcorrplot(corr, hc.method = TRUE,
+           type = "lower",
+           lab = TRUE,
+           lab_size = 3,
+           method = "circle",
+           colors = c("tomato2", "white", "springgreen3"),
+           title = "Correlogram of Numerical Employee Data",
+           ggtheme = theme_bw)
+```
+Looks like there are only 9 categorical variables in the dataset and around 28 for numerical variables. This will mean we would want to do some dummy coding later when we decide the attrition factors.
+
+As per the above correlogram, there seems to be a strong relationship of certain variable intune with Monthly income:
+- Job Level: Strong correlation at 1
+- Age: Moderate correlation at 0.5
+- TotalWorkingYears: Strong correlation at 0.8
+- YearsAtCompany: Moderate correlation at 0.5
+
+##Finding Attrition Factors
+```{r}
 ###Lets look at a rough analysis on multiple different columns to see if we can figure something out
-attritionData %>% select(Attrition, JobRole, MonthlyIncome) %>% ggpairs(aes(color = Attrition))
-attritionData %>% select(MonthlyIncome, Education, TotalWorkingYears, Attrition) %>% ggpairs(mapping = aes(color = Attrition)) + ggtitle("Monthly Income vs Education, Experience, and Attrition")
+attritionData %>% select(MonthlyIncome, Age, TotalWorkingYears, YearsAtCompany, Attrition) %>% ggpairs(mapping = aes(color = Attrition)) + ggtitle("Monthly Income vs Education, Experience, and Attrition")
 
 attritionData %>% select(MonthlyIncome, YearsAtCompany, TotalWorkingYears, YearsInCurrentRole, OverTime) %>% ggpairs(mapping = aes(color = OverTime)) + ggtitle("Monthly Income vs Years in Industry by Overtime")
 
@@ -68,9 +89,15 @@ attritionData %>% select(MonthlyIncome, YearsAtCompany, TotalWorkingYears, Years
 attritionData %>% ggplot(aes(x = JobRole, y = MonthlyIncome, fill = Attrition)) + geom_bar(stat = "identity", width = .5) + labs(title = "Income", subtitle = "along with Attrition") + theme(axis.text.x = element_text(angle = 65, vjust = 0.6))
 
 #Plotting monthly income and years at company, color coating by job role
-attritionData %>% ggplot(aes(x = MonthlyIncome, y = YearsAtCompany, color = JobRole)) + geom_point(position = "jitter") + ggtitle("Monthly Income vs Years at Company")
+attritionData %>% ggplot(aes(x = MonthlyIncome, y = JobLevel, color = Attrition)) + geom_point(position = "jitter") + ggtitle("Monthly Income vs Years at Company")
+
+summary(attritionData$Age)
+
+#I want to see what relationship age and years since last promotion have with attrition. Does the age and the years since last promotion affect attrition?
+attritionData %>% ggplot(aes(x = Age, y = YearsSinceLastPromotion, color = Attrition)) + geom_point(position = "jitter") + geom_smooth(method = "lm", se = F) + ggtitle("Age vs Years at Company colored by Attrition")
+
 ```
-At a glance, it looks like a common variable that influences Attrition as well as monthly income is Total Working Years (experience). There is a moderate correlation between Monthly Income and Years at the company along with attrition as per the scatter graph above.
+At a glance, it looks like age and years since last promotion do play a big role for turnover/attrition. As per the final graph there seems to be some information that tells us that there are many young people that seem to leave the company. At 0 since years since last promotion, this tells me that they have not been working in the company as long. 
 
 #Interesting Facts/Trend
 There was also an interesting trend that was noticed as something that is interesting. As per the bar chart it looks like the most satisfying job is the Sales Executive Job. Human resources specialists and managers seem to have the lower job satisfaction. There is definitely more men than women that filled some of these roles.
@@ -78,58 +105,76 @@ There was also an interesting trend that was noticed as something that is intere
 attritionData %>% ggplot(aes(x = JobRole, y = JobSatisfaction, fill = Gender)) + geom_bar(stat = "identity", width = .5) + labs(title = "Job Satisfaction by Role", subtitle = "Which gender has the higher job satisfaction?") + theme(axis.text.x = element_text(angle = 60, vjust = 0.6))
 ```
 
-
-
 ```{r}
-#ScatterPlot for trends
-attritionData %>% ggplot(aes(x = MonthlyIncome, y = Education)) + geom_point(position = "jitter")
+#Filtering out Attrition by Yes and No
+atrritionYes = attritionData %>% filter(Attrition == "Yes")
+attritionNo = attritionData %>% filter(Attrition == "No")
 
-attritionData %>% ggplot(aes(x = DistanceFromHome, y = Age, color = Attrition)) + geom_point(position = "jitter")
+set.seed(0)
+splitPerc = .70
+trainIndices = sample(1:dim(atrritionYes)[1], round(splitPerc * dim(atrritionYes)[1]))
+train = atrritionYes[trainIndices,]
+test = atrritionYes[-trainIndices,]
 
-attritionData %>% ggplot(aes(x = NumCompaniesWorked, fill = Attrition)) + geom_histogram()
+set.seed(6)
+splitPerc = .70
+trainIndices2 = sample(1:dim(attritionNo)[1], round(splitPerc * dim(attritionNo)[1]))
+train1 = attritionNo[trainIndices2,]
+test1 = attritionNo[-trainIndices2,]
 
 
-#Need to dummy code Attrition, if needed later
-attritionData$AttritionNum = str_replace(attritionData$Attrition, "No", "0")
+train_final = rbind(train1, train)
+test_final = rbind(test1, test)
+final_data = rbind(train,train1,test, test1)
+oneTime = rbind(train_final, test_final)
 
-attritionData$AttritionNum = str_replace(attritionData$AttritionNum, "Yes", "1")
+set.seed(0)
+splitPerc = .70
+trainIndices3 = sample(1:dim(attritionData)[1], round(splitPerc * dim(attritionData)[1]))
+train3 = attritionData[trainIndices3,]
+test3 = attritionData[-trainIndices3,]
 
-attritionData$AttritionNum = as.integer(attritionData$AttritionNum)
 
-noAttr = noAttritionData %>% select(ID, WorkLifeBalance, JobInvolvement, YearsAtCompany)
+#Need to dummy code Business Travel, if needed later. Its one of the categories that I believed plays a role in attrition. It will be needed later on if we decide to test out different combonations.
+attritionData$Travel_Num = str_replace(attritionData$BusinessTravel, "Travel_Rarely", "1")
+attritionData$Travel_Num = str_replace(attritionData$Travel_Num, "Travel_Frequently", "2")
+attritionData$Travel_Num = str_replace(attritionData$Travel_Num, "Non-Travel", "0")
+attritionData$Travel_Num = as.integer(attritionData$Travel_Num)
 
+#Use later for test data
+noAttr = noAttritionData %>% select(ID, Age, StockOptionLevel, YearsSinceLastPromotion)
 #Lets do KNN
-case = attritionData %>% select(ID, Age, YearsInCurrentRole, EnvironmentSatisfaction, Attrition)
+case = attritionData %>% select(ID, Age, StockOptionLevel, YearsSinceLastPromotion, Attrition) %>% group_by(ID)
 att = data_frame(WorkLifeBalance = 2, JobInvolvement = 1, YearsAtCompany = 5)
 knn(case[,c(2,3,4)], att, case$Attrition, k = 3, prob = TRUE)
-attr_pred = knn(case[,c(2,3,4)], noAttr[,c(2,3,4)], case$Attrition, k = 19, prob = TRUE)
+attr_pred = knn(case[,c(2,3,4)], noAttr[,c(2,3,4)], case$Attrition, k = 13, prob = TRUE)
 noAttr$Attrition = attr_pred
-table(attr_pred, noAttr$Attrition)
+confusionMatrix(table(attr_pred, noAttr$Attrition))
 noAttr = noAttr[,-5]
 
 #Train Data and Test Set
 set.seed(6)
-splitPerc = .80
+splitPerc = .70
 trainIndices = sample(1:dim(case)[1], round(splitPerc * dim(case)[1]))
 train = case[trainIndices,]
 test = case[-trainIndices,]
 
 #K = 3
 classifications = knn(train[,2:4], test[,2:4], train$Attrition, k = 3, prob = TRUE)
-table(classifications, test$Attrition)
-confusionMatrix(table(classifications, test$Attrition))
-#K = 7
-classifications = knn(train[,2:4], test[,2:4], train$Attrition, k = 7, prob = TRUE)
-table(classifications, test$Attrition)
-confusionMatrix(table(classifications, test$Attrition))
-#k=13
+table(test$Attrition, classifications)
+confusionMatrix(table(test$Attrition, classifications))
+#k = 13
 classifications = knn(train[,2:4], test[,2:4], train$Attrition, k = 13, prob = TRUE)
-table(classifications, test$Attrition)
-confusionMatrix(table(classifications, test$Attrition))
+table(test$Attrition, classifications)
+confusionMatrix(table(test$Attrition, classifications))
+#k=23
+classifications = knn(train[,2:4], test[,2:4], train$Attrition, k = 19, prob = TRUE)
+table(test$Attrition, classifications)
+confusionMatrix(table(test$Attrition, classifications))
 
 #Now going to loop through more than one k and find the average
-iterations = 100
-set.seed(0)
+iterations = 500
+set.seed(2)
 numks = 30
 masterAcc = matrix(nrow = iterations, ncol = numks)
 kkk = c()
@@ -138,20 +183,19 @@ Spec = c()
   
 for(j in 1:iterations)
 {
-accs = data.frame(accuracy = numeric(30), k = numeric(30))
 trainIndices = sample(1:dim(case)[1], round(splitPerc * dim(case)[1]))
 train = case[trainIndices,]
 test = case[-trainIndices,]
 for(i in 1:numks)
-{
-  classifications = knn(train[, 2:4], test[, 2:4], train$Attrition, prob = TRUE, k = i)
-  table(classifications, test$Attrition)
-  CM = confusionMatrix(table(classifications,test$Attrition))
-  masterAcc[j,i] = CM$overall[1]
-  kkk[i] = CM$overall[1]
-  Sens[i] = CM$byClass[1]
-  Spec[i] = CM$byClass[2]
-}
+  {
+    classifications = knn(train[,2:4], test[,2:4], train$Attrition, prob = TRUE, k = i)
+    table(test$Attrition, classifications)
+    CM = confusionMatrix(table(test$Attrition, classifications))
+    masterAcc[j,i] = CM$overall[1]
+    kkk[i] = CM$overall[1]
+    Sens[i] = CM$byClass[1]
+    Spec[i] = CM$byClass[2]
+  }
 }
 MeanAcc = colMeans(masterAcc)
 plot(seq(1,numks,1),MeanAcc, type = "l")
@@ -164,12 +208,12 @@ combo = data_frame(k = 1:30,Sensitivity = Sens, Specificity = Spec, MeanAcc)
 #linear models for Salaries (on attrition data before the split)
 reg = lm(MonthlyIncome~Education, attritionData)
 reg2 = lm(MonthlyIncome~TotalWorkingYears, attritionData)
-mReg = lm(MonthlyIncome~TotalWorkingYears + Education, attritionData)
+mReg = lm(MonthlyIncome~TotalWorkingYears + Age + YearsAtCompany + JobLevel, attritionData)
 
 #Test with just two observations
 df = data.frame(TotalWorkingYears = 10, Education = 4)
 #Create new Data Frame with just experience and education to predict salary for each person
-EduTotal = noSalaryData %>% select(ID,TotalWorkingYears, Education)
+EduTotal = noSalaryData %>% select(ID,TotalWorkingYears, Age, YearsAtCompany, JobLevel)
 #Prediction
 pred = predict(mReg, newdata = df, interval = "confidence")
 pred2 = predict(mReg, newdata = EduTotal)
@@ -186,8 +230,13 @@ RMSE = sqrt(MSE)
 EduTotal$MonthlySalary = pred2
 EduTotal$MonthlySalary = as.integer(EduTotal$MonthlySalary)
 
+Final_CSV_Linear = EduTotal %>% select(ID, MonthlySalary)
+
+#Writing predictions to CSV
+#write.csv(Final_CSV_Linear, file = "Case2PredictionsVankina Salary.csv")
+
 #Validation Set
-vReg = lm(MonthlySalary~TotalWorkingYears + Education, EduTotal)
+vReg = lm(MonthlySalary~TotalWorkingYears + Age + YearsAtCompany + JobLevel, EduTotal)
 vReg
 confint(vReg)
 
