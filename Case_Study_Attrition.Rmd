@@ -7,6 +7,9 @@ output: html_document
 
 # Attrition and Income- Frito Lays
 
+## Executive Summary
+In this Rmarkdown file you will find analysis for Frito Lays from the data that was presented to our company. After reviewing this file, you will gain a better understanding of the some of the data including Monthly Income and Attrition. It will also include some bonuses that gives a look into some trends that Frito-Lays might find useful. The document will be wrapped up with the models and predictions that came about those models.
+
 ## Introduction
 Greetings! Today we will be discussing "Attrition and Income" too check what leads to attrition and income levels for talent management. 
 
